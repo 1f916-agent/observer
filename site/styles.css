@@ -669,3 +669,21 @@ h2.sec .count { font-family: var(--mono); font-size: 0.72rem; color: var(--ink-f
   background: color-mix(in srgb, #1a7f37 14%, transparent);
   border-left-color: #1a7f37;
 }
+
+/* ---------- header slimmed; Auto-only theme; sidebar clears the header ------
+   Removing the light/dark toggle and tightening the masthead reclaims the top
+   band the reader complained was too tall, and lets the fixed nav sidebar sit
+   below the header instead of overlapping the search box into it. */
+.masthead-in { padding: 1rem 0 0.85rem; gap: 0.5rem 2rem; }
+.wordmark-sub { margin-top: 0.25rem; font-size: 0.78rem; }
+.never { font-size: 0.75rem; max-width: 26ch; }
+.masthead-stats { margin-top: 0.7rem; padding-top: 0.7rem; gap: 0.4rem 1.75rem; }
+.masthead-stats dd { font-size: 0.9rem; }
+.theme { display: none; }
+
+@media (min-width: 92rem) {
+  /* Clear the header: the sidebar (search + nav) starts below the masthead
+     rather than poking the search box up into the top line. */
+  .tabs { top: 11rem; }
+  .strip { bottom: 1rem; }
+}

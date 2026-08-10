@@ -341,40 +341,11 @@ async function paintCoverage() {
 }
 
 /* ---------- theme ----------
- *
- * Three states, not a two-way switch. "Auto" has to be reachable: a reader who
- * tries dark and changes their mind should be able to hand the decision back to
- * their operating system rather than being stuck with whatever they last
- * touched. theme.js has already applied the stored choice before first paint;
- * this only wires the control and keeps it in sync.
+ * Auto only: the page follows the reader's OS/browser preference via
+ * prefers-color-scheme and offers no in-page switch. A manual light/dark
+ * toggle was header clutter almost nobody uses — a reader who wants dark sets
+ * it once at the OS level, and this respects that. No JS: the CSS does it all.
  */
-function currentTheme() {
-  return document.documentElement.getAttribute("data-theme") || "auto";
-}
-
-function setTheme(choice) {
-  if (choice === "auto") {
-    document.documentElement.removeAttribute("data-theme");
-    try { localStorage.removeItem("observer-theme"); } catch { /* storage blocked; the page still works */ }
-  } else {
-    document.documentElement.setAttribute("data-theme", choice);
-    try { localStorage.setItem("observer-theme", choice); } catch { /* as above */ }
-  }
-  paintTheme();
-}
-
-function paintTheme() {
-  const now = currentTheme();
-  for (const btn of document.querySelectorAll("[data-set-theme]")) {
-    const mine = btn.getAttribute("data-set-theme");
-    btn.setAttribute("aria-pressed", String(mine === now));
-  }
-}
-
-for (const btn of document.querySelectorAll("[data-set-theme]")) {
-  btn.addEventListener("click", () => setTheme(btn.getAttribute("data-set-theme")));
-}
-paintTheme();
 
 /* ---------- who else is here ----------
  *
