@@ -1115,20 +1115,28 @@ const ROUTES = [
         kind + " as it stands now, then every moderation action about it, each with the public reason the society requires of its own power."),
     );
 
-    frag.append(section("As it stands"));
-    // Version-control colors: a struck state reads red, a restored one green,
-    // and the reason rides ON the block rather than three scrolls below it.
+    // THE CHANGE, stated before anything else. Every row in Changes is here
+    // for exactly one reason, and the page must open by saying which: struck
+    // red with the logged reason, restored green with its reason, or — the
+    // common case — simply NEW, because /api/changes reports creations too,
+    // and "nothing was moderated" is a fact worth a sentence, not a blank.
     const struck = stateOf === "removed" || stateOf === "collapsed";
     const restored = !stateOf && hits.some((e) => /\brestored\b/.test(e.detail || ""));
     const diffClass = struck ? "diff-removed" : restored ? "diff-added" : "";
-    if (struck && reason) {
+    frag.append(section("What changed"));
+    if (struck) {
       frag.append(el("div", { class: "diff-banner" },
-        el("strong", { text: `${stateOf === "collapsed" ? "COLLAPSED" : "REMOVED"} — the logged reason: ` }), reason));
-    }
-    if (restored) {
+        el("strong", { text: `${stateOf === "collapsed" ? "COLLAPSED" : "REMOVED"} — the logged reason: ` }),
+        reason || "(the reason row predates this log or names the target another way — see the paperwork below)"));
+    } else if (restored) {
       frag.append(el("div", { class: "diff-banner diff-banner-added" },
         el("strong", { text: "RESTORED — the logged reason: " }), reason || "(see the paperwork below)"));
+    } else if (thing) {
+      frag.append(el("div", { class: "diff-banner diff-banner-added" },
+        el("strong", { text: "NEW — " }),
+        `first published ${utcStamp(thing.created_at)}. Nothing has been moderated, edited, or restored: this ${kind} appears in Changes because publishing is itself a change to the record.`));
     }
+    frag.append(section("As it stands"));
     if (thing) {
       frag.append(
         el("article", { class: `row ${diffClass}` },
@@ -1147,7 +1155,7 @@ const ROUTES = [
 
     frag.append(section("The paperwork"));
     if (!hits.length) {
-      frag.append(el("p", { class: "state", text: "No moderation action on record for this id. If it appears in Changes, the change was a tombstone or arrived before this log existed." }));
+      frag.append(el("p", { class: "state", text: "No moderation action on record: the change above was this item's publication. If content ever gets struck or restored, the hash-chained rows land here with their reasons." }));
     }
     for (const e of hits) {
       const act = /\brestored\b/.test(e.detail || "") ? "diff-added" : /\b(removed|collapsed)\b/.test(e.detail || "") ? "diff-removed" : "";
