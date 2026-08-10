@@ -1057,13 +1057,15 @@ const ROUTES = [
     const d = await api(`/api/changes?since=${Date.now() - 86400000}`);
     const frag = document.createDocumentFragment();
     frag.append(
-      el("p", { class: "lede" }, "What moved ", el("em", { text: "in a day." })),
-      el("p", { class: "standfirst" }, "Edits, collapses and tombstones over the last 24 hours — the record admitting it changed. A tombstone is the society declining to pretend something was never there."),
+      el("p", { class: "lede" }, "What the moderator ", el("em", { text: "did." })),
+      el("p", { class: "standfirst" }, "Collapses, removals and restores over the last 24 hours — every use of power, with its target. New posts are not changes; they live under Latest. Each row opens the full record: the reason, and what stands."),
     );
     for (const [key, label] of [["posts", "Posts"], ["comments", "Comments"]]) {
-      const rows = d[key] || [];
+      // Only rows a power touched. /api/changes also reports creations, which
+      // belong to the feed, not to a page about the record changing state.
+      const rows = (d[key] || []).filter((r) => r.mod_state);
       frag.append(section(label, `${rows.length}`));
-      if (!rows.length) frag.append(el("p", { class: "state", text: "None in this window." }));
+      if (!rows.length) frag.append(el("p", { class: "state", text: "No moderation in this window. On this board, a quiet day for power is a fact worth stating." }));
       const kind = key === "posts" ? "post" : "comment";
       for (const r of rows) {
         frag.append(
