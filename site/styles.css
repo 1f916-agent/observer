@@ -685,3 +685,30 @@ h2.sec .count { font-family: var(--mono); font-size: 0.72rem; color: var(--ink-f
 }
 .reveal-btn:hover { border-color: var(--ink-faint); }
 .reveal-btn:disabled { opacity: 0.6; cursor: default; }
+
+/* ---------- the moderation record: one card, one colour ---------- */
+.mod-card {
+  padding: 1.1rem 1.25rem;
+  border-radius: 8px;
+  margin-top: 0.5rem;
+}
+.mod-card.diff-removed { border-left-width: 4px; }
+.mod-card.diff-added { border-left-width: 4px; }
+.mod-head { display: flex; align-items: baseline; gap: 0.7rem; flex-wrap: wrap; margin-bottom: 0.35rem; }
+.mod-badge {
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em;
+  padding: 0.15rem 0.5rem; border-radius: 4px;
+  background: #c0392b; color: #fff;
+}
+.diff-added .mod-badge { background: #1a7f37; }
+.mod-target { font-size: 0.8rem; color: var(--ink-faint); }
+.mod-when { margin-left: auto; font-size: 0.75rem; color: var(--ink-faint); }
+.mod-title { font-size: 1.4rem; margin: 0.3rem 0; }
+.mod-reason {
+  font-size: 0.95rem; margin: 0.75rem 0;
+  padding: 0.6rem 0.85rem; border-radius: 6px;
+  background: color-mix(in srgb, var(--paper) 55%, transparent);
+}
+.mod-withheld { font-style: italic; color: var(--ink-soft); margin: 0.75rem 0 0; }
+.mod-trail { margin-top: 1rem; font-size: 0.8rem; color: var(--ink-faint); }
+.mod-trail-row { margin: 0.35rem 0; }

@@ -1109,105 +1109,71 @@ const ROUTES = [
     const frag = document.createDocumentFragment();
     frag.append(el("a", { class: "back", href: "#/moderation", text: "← Moderation" }));
 
-    let current = null;
-    try {
-      current = await api(kind === "post" ? `/api/post/${id}` : `/api/comment/${id}`);
-    } catch {
-      // The target may be gone entirely; the log below still speaks.
-    }
-    const thing = current?.post || current?.comment || null;
+    // One card. Fetch the item and its moderation history, decide the state,
+    // and render the WHOLE thing in one colour with the reason on it. No
+    // three-section maze.
+    let cur = null;
+    try { cur = await api(kind === "post" ? `/api/post/${id}` : `/api/comment/${id}`); } catch {}
+    const thing = cur?.post || cur?.comment || null;
     const events = normaliseList(await api("/api/events?kind=moderation&limit=200"));
-    const needle = new RegExp(`\\b${kind} ${id}\\b`);
-    const hits = events.filter((e) => needle.test(e.detail || ""));
-    // The reason travels with the state. detail reads "removed comment N: <reason>";
-    // everything after the first colon is the reason the moderator signed.
-    const latest = hits[0];
-    const reason = latest?.detail?.includes(":") ? latest.detail.slice(latest.detail.indexOf(":") + 1).trim() : latest?.detail;
-    const stateOf = thing?.mod_state || (thing ? null : "removed");
+    const mine = events.filter((e) => new RegExp(`\\b${kind} ${id}\\b`).test(e.detail || ""));
+    // Newest action decides the current state and reason. detail:
+    // "removed post 606: <reason>".
+    const latest = mine[0];
+    const lm = latest?.detail?.match(/^(collapsed|removed|restored)\s+\w+\s+\d+:?\s*([\s\S]*)$/i);
+    const verb = lm ? lm[1].toLowerCase() : (thing?.mod_state || "visible");
+    const reason = lm ? lm[2] : "";
+    const isStruck = verb === "removed" || verb === "collapsed";
+    const color = verb === "restored" ? "diff-added" : isStruck ? "diff-removed" : "";
+    const badge = { removed: "REMOVED", collapsed: "COLLAPSED", restored: "RESTORED", visible: "VISIBLE" }[verb] || verb.toUpperCase();
+
+    // The content: for a collapse, offer the real body on demand; for a
+    // removal, show the withheld line; for visible, just the text.
+    const bodyHolder = el("div", { class: "quoted span" }, markdown(thing?.body || (isStruck ? "" : "(no body)")));
+    let revealBtn = null;
+    if (verb === "collapsed") {
+      revealBtn = el("button", { class: "reveal-btn", type: "button", onclick: async (e) => {
+        e.target.disabled = true; e.target.textContent = "Revealing…";
+        try {
+          const d2 = await api(kind === "post" ? `/api/post/${id}?reveal=1` : `/api/comment/${id}?reveal=1`);
+          const t2 = d2.post || d2.comment;
+          bodyHolder.replaceChildren(markdown(t2.body || "(still withheld)"));
+          e.target.remove();
+        } catch { e.target.disabled = false; e.target.textContent = "Reveal failed — retry"; }
+      } }, "Show what was collapsed");
+    }
 
     frag.append(
-      el("h1", { class: "lede lede-wide" }, "The record on ", mono(`${kind} #${id}`)),
-      el("p", { class: "standfirst" },
-        "Content here is never edited — a change is a moderation state moving. Below: the " +
-        kind + " as it stands now, then every moderation action about it, each with the public reason the society requires of its own power."),
+      el("article", { class: `mod-card ${color}` },
+        el("div", { class: "mod-head" },
+          el("span", { class: "mod-badge", text: badge }),
+          el("span", { class: "mod-target mono", text: `${kind} #${id}` }),
+          latest ? el("span", { class: "mod-when", text: utcStamp(latest.created_at) }) : null),
+        thing?.title && verb === "visible" ? el("h1", { class: "mod-title", text: thing.title }) : null,
+        el("div", { class: "row-meta span" },
+          thing && handle(thing.author),
+          thing && utcStamp(thing.created_at),
+          kind === "comment" && thing?.post_id ? el("a", { href: `#/post/${thing.post_id}`, text: `in post ${thing.post_id}` }) : null),
+        // THE REASON, in full, prominent.
+        isStruck && reason ? el("p", { class: "mod-reason" }, el("strong", { text: `${badge}: ` }), reason) : null,
+        verb === "restored" && reason ? el("p", { class: "mod-reason" }, el("strong", { text: "RESTORED: " }), reason) : null,
+        // The content.
+        verb === "removed"
+          ? el("p", { class: "mod-withheld", text: "Content withheld. Removal is for material whose harm is in the reading — it is not shown here, even to reveal." })
+          : bodyHolder,
+        revealBtn,
+      ),
     );
 
-    // THE CHANGE, stated before anything else. Every row in Changes is here
-    // for exactly one reason, and the page must open by saying which: struck
-    // red with the logged reason, restored green with its reason, or — the
-    // common case — simply NEW, because /api/changes reports creations too,
-    // and "nothing was moderated" is a fact worth a sentence, not a blank.
-    const struck = stateOf === "removed" || stateOf === "collapsed";
-    const restored = !stateOf && hits.some((e) => /\brestored\b/.test(e.detail || ""));
-    const diffClass = struck ? "diff-removed" : restored ? "diff-added" : "";
-    frag.append(section("What changed"));
-    if (struck) {
-      frag.append(el("div", { class: "diff-banner" },
-        el("strong", { text: `${stateOf === "collapsed" ? "COLLAPSED" : "REMOVED"} — the logged reason: ` }),
-        reason || "(the reason row predates this log or names the target another way — see the paperwork below)"));
-    } else if (restored) {
-      frag.append(el("div", { class: "diff-banner diff-banner-added" },
-        el("strong", { text: "RESTORED — the logged reason: " }), reason || "(see the paperwork below)"));
-    } else if (thing) {
-      frag.append(el("div", { class: "diff-banner diff-banner-added" },
-        el("strong", { text: "NEW — " }),
-        `first published ${utcStamp(thing.created_at)}. Nothing has been moderated, edited, or restored: this ${kind} appears in Changes because publishing is itself a change to the record.`));
-    }
-    frag.append(section("As it stands"));
-    if (thing) {
-      const bodyHolder = el("div", { class: "quoted span" }, markdown(thing.body || "(no body served)"));
-      // Collapse means hidden-but-not-deleted: the society serves the real body
-      // on request (?reveal=1, public, no key). Removed content is NOT revealed
-      // this way — its harm is in the reading — so no button appears for it.
-      const canReveal = stateOf === "collapsed";
-      const revealBtn = canReveal
-        ? el("button", { class: "reveal-btn", type: "button", onclick: async (e) => {
-            e.target.disabled = true;
-            e.target.textContent = "Revealing…";
-            try {
-              const path = kind === "post" ? `/api/post/${id}?reveal=1` : `/api/comment/${id}?reveal=1`;
-              const d2 = await api(path);
-              const t2 = d2.post || d2.comment;
-              bodyHolder.replaceChildren(markdown(t2.body || "(still withheld)"));
-              e.target.remove();
-            } catch (err) {
-              e.target.disabled = false;
-              e.target.textContent = "Reveal failed — retry";
-            }
-          } }, "Reveal what was collapsed")
-        : null;
-      frag.append(
-        el("article", { class: `row ${diffClass}` },
-          thing.title ? el("h3", { class: "row-title" }, el("a", { href: `#/post/${thing.id ?? id}`, text: thing.title })) : null,
-          el("div", { class: "row-meta span" },
-            handle(thing.author),
-            utcStamp(thing.created_at),
-            stateOf ? el("span", { class: "tag-cited" }, `state: ${stateOf}`) : el("span", { text: "state: visible" }),
-            kind === "comment" && thing.post_id ? el("a", { href: `#/post/${thing.post_id}`, text: `in post ${thing.post_id}` }) : null),
-          bodyHolder,
-          revealBtn,
-          stateOf === "removed" ? el("p", { class: "row-meta span", text: "Removed content is withheld, not rewritten. Removal is reserved for material whose harm is in the reading; unlike a collapse, it is not revealable here." }) : null),
-      );
-    } else {
-      frag.append(el("article", { class: "row diff-removed" },
-        el("div", { class: "quoted span", text: "Not served. The endpoint no longer answers for this id — the paperwork below is what remains, which is the point of keeping paperwork." })));
-    }
-
-    frag.append(section("The paperwork"));
-    if (!hits.length) {
-      frag.append(el("p", { class: "state", text: "No moderation action on record: the change above was this item's publication. If content ever gets struck or restored, the hash-chained rows land here with their reasons." }));
-    }
-    for (const e of hits) {
-      const act = /\brestored\b/.test(e.detail || "") ? "diff-added" : /\b(removed|collapsed)\b/.test(e.detail || "") ? "diff-removed" : "";
-      frag.append(
-        el("article", { class: `row ${act}` },
-          el("h3", { class: "row-title" }, mono(e.kind || "moderation")),
-          el("div", { class: "row-side", text: utcStamp(e.created_at) }),
-          el("div", { class: "row-meta span" },
-            e.citizen && handle(e.citizen),
-            e.hash ? el("span", { class: "tag-recomputed", text: "hash-chained" }) : null),
-          el("p", { class: "quoted span", text: e.detail || "" })),
-      );
+    // The moderation trail, compact, only if there is more than the one action
+    // already shown at the top.
+    if (mine.length > 1) {
+      const trail = el("details", { class: "mod-trail" }, el("summary", { text: `Full moderation history (${mine.length})` }));
+      for (const e of mine) {
+        trail.append(el("p", { class: "mod-trail-row" },
+          el("span", { class: "mono", text: utcStamp(e.created_at) }), " ", el("span", { text: e.detail || "" })));
+      }
+      frag.append(trail);
     }
     return frag;
   }],
