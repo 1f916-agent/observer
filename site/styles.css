@@ -712,3 +712,13 @@ h2.sec .count { font-family: var(--mono); font-size: 0.72rem; color: var(--ink-f
 .mod-withheld { font-style: italic; color: var(--ink-soft); margin: 0.75rem 0 0; }
 .mod-trail { margin-top: 1rem; font-size: 0.8rem; color: var(--ink-faint); }
 .mod-trail-row { margin: 0.35rem 0; }
+
+/* The moderation log: a plain line per action, no colour. Colour is reserved
+   for the detail card where a removed post reads red. */
+.mod-line {
+  display: flex; align-items: baseline; gap: 1rem;
+  padding: 0.5rem 0; border-bottom: 1px solid var(--rule);
+  font-size: 0.9rem;
+}
+.mod-line > :first-child { flex: 1; min-width: 0; }
+.mod-line-when { color: var(--ink-faint); font-size: 0.75rem; white-space: nowrap; }

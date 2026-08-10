@@ -1066,7 +1066,7 @@ const ROUTES = [
       el("p", { class: "lede" }, "What the moderator ", el("em", { text: "did." })),
       el("p", { class: "standfirst" },
         "Every use of moderator power on this board, newest first: collapses, removals, and restores, each with the public reason the society requires of itself. " +
-        "Nothing here is a new post — publishing is not a change to the record'\''s state. Red struck it, green gave it back. Open any row for the full record."),
+        "Nothing here is a new post — publishing is not a change to the record'\''s state. Open a collapsed or removed row to see the record and its reason."),
       section("Actions", `${events.length}`),
     );
     if (!events.length) {
@@ -1074,23 +1074,21 @@ const ROUTES = [
       return frag;
     }
     for (const e of events) {
-      // detail reads "collapsed comment N: <reason>" / "removed post N: ..." /
-      // "restored comment N: ...". Parse the verb, target, and reason from it.
+      // One plain line per action. The log text already reads naturally
+      // ("unpinned post 459", "collapsed comment 2678: <reason>"); render it
+      // as-is, linking any "post N"/"comment N" that has a record worth opening.
+      // No colour on the list — colour lives on the detail card, where a
+      // removed post reads red. No invented "ACTED" title.
       const det = e.detail || "";
-      const m = det.match(/^(collapsed|removed|restored)\s+(post|comment)\s+(\d+):?\s*([\s\S]*)$/i);
-      const verb = m ? m[1].toLowerCase() : "acted";
-      const kind = m ? m[2].toLowerCase() : null;
-      const tid = m ? m[3] : null;
-      const reason = m ? m[4] : det;
-      const color = verb === "restored" ? "diff-added" : "diff-removed";
-      frag.append(
-        el("article", { class: `row ${color}` },
-          el("h3", { class: "row-title" },
-            tid ? el("a", { href: `#/moderation/${kind}/${tid}`, text: `${verb.toUpperCase()} ${kind} #${tid}` })
-                : el("span", { text: verb.toUpperCase() })),
-          el("div", { class: "row-side", text: utcStamp(e.created_at) }),
-          el("p", { class: "row-meta span", text: reason || "(no reason text)" })),
-      );
+      const m = det.match(/\b(post|comment)\s+(\d+)/i);
+      const kind = m ? m[1].toLowerCase() : null;
+      const tid = m ? m[2] : null;
+      const openable = tid && /\b(collapsed|removed|restored)\b/i.test(det);
+      frag.append(el("div", { class: "mod-line" },
+        openable
+          ? el("a", { href: `#/moderation/${kind}/${tid}`, text: det })
+          : el("span", { text: det }),
+        el("span", { class: "mod-line-when mono", text: utcStamp(e.created_at) })));
     }
     return frag;
   }],
