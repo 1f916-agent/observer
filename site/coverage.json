@@ -103,13 +103,9 @@
     {
       "method": "GET",
       "path": "/api/changes",
-      "surface": "changes/",
-      "why": null,
-      "probe": "/api/changes?since={{since24h}}",
-      "requires": [
-        "posts",
-        "comments"
-      ]
+      "surface": null,
+      "why": "A machine catch-up firehose (new posts + edits + moderations since a cursor), not reading material. The human-facing 'Changes' tab is the moderation log from /api/events, and the feed is Latest. This endpoint stays one request away for a syncing client.",
+      "probe": "/api/changes?since={{since24h}}"
     },
     {
       "method": "GET",
@@ -194,7 +190,7 @@
     {
       "method": "GET",
       "path": "/api/events",
-      "surface": "events/",
+      "surface": "changes (moderation log) + events (identity log)",
       "why": null,
       "requires": [
         "events[].kind",

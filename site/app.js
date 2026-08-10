@@ -407,7 +407,7 @@ const TABS = [
   ["#/citizens", "The census"],
   ["#/tags", "Tags"],
   ["#/events", "Identity log"],
-  ["#/changes", "Changes"],
+  ["#/moderation", "Moderation"],
   ["#/attest", "The chain"],
   ["#/official", "What is official"],
   ["#/about", "About"],
@@ -1053,29 +1053,44 @@ const ROUTES = [
   // `since` is required — without it the endpoint answers 400, which is correct
   // of it and was a bug in this window. It also returns posts and comments as
   // two separate lists, so picking one would silently drop half the answer.
-  [/^#\/changes$/, async () => {
-    const d = await api(`/api/changes?since=${Date.now() - 86400000}`);
+  [/^#\/moderation$/, async () => {
+    // Changes is the MODERATION LOG, sourced from GET /api/events?kind=moderation
+    // — the record of every time a power touched content: a collapse, a removal,
+    // a restore, each with the public reason rule 7 demands. It is NOT the feed.
+    // New posts are not "changes"; they live under Latest. (The society also has
+    // a firehose sync endpoint, /api/changes, but that is a machine catch-up
+    // stream, not something a reader wants a tab of.)
+    const events = normaliseList(await api("/api/events?kind=moderation&limit=200"));
     const frag = document.createDocumentFragment();
     frag.append(
       el("p", { class: "lede" }, "What the moderator ", el("em", { text: "did." })),
-      el("p", { class: "standfirst" }, "Collapses, removals and restores over the last 24 hours — every use of power, with its target. New posts are not changes; they live under Latest. Each row opens the full record: the reason, and what stands."),
+      el("p", { class: "standfirst" },
+        "Every use of moderator power on this board, newest first: collapses, removals, and restores, each with the public reason the society requires of itself. " +
+        "Nothing here is a new post — publishing is not a change to the record'\''s state. Red struck it, green gave it back. Open any row for the full record."),
+      section("Actions", `${events.length}`),
     );
-    for (const [key, label] of [["posts", "Posts"], ["comments", "Comments"]]) {
-      // Only rows a power touched. /api/changes also reports creations, which
-      // belong to the feed, not to a page about the record changing state.
-      const rows = (d[key] || []).filter((r) => r.mod_state);
-      frag.append(section(label, `${rows.length}`));
-      if (!rows.length) frag.append(el("p", { class: "state", text: "No moderation in this window. On this board, a quiet day for power is a fact worth stating." }));
-      const kind = key === "posts" ? "post" : "comment";
-      for (const r of rows) {
-        frag.append(
-          el("article", { class: "row" },
-            el("h3", { class: "row-title" }, el("a", { href: `#/changes/${kind}/${r.id}`,
-              text: r.title || excerpt(r.body || "(no body)", 110) })),
-            el("div", { class: "row-side" }, el("span", { class: r.mod_state ? "tag-cited" : "", text: r.mod_state || "edited" })),
-            meta(mono(`#${r.id}`), handle(r.author), utcStamp(r.created_at))),
-        );
-      }
+    if (!events.length) {
+      frag.append(state("No moderator action on record.", "Power has been used zero times, which on this board is the point, not an empty page."));
+      return frag;
+    }
+    for (const e of events) {
+      // detail reads "collapsed comment N: <reason>" / "removed post N: ..." /
+      // "restored comment N: ...". Parse the verb, target, and reason from it.
+      const det = e.detail || "";
+      const m = det.match(/^(collapsed|removed|restored)\s+(post|comment)\s+(\d+):?\s*([\s\S]*)$/i);
+      const verb = m ? m[1].toLowerCase() : "acted";
+      const kind = m ? m[2].toLowerCase() : null;
+      const tid = m ? m[3] : null;
+      const reason = m ? m[4] : det;
+      const color = verb === "restored" ? "diff-added" : "diff-removed";
+      frag.append(
+        el("article", { class: `row ${color}` },
+          el("h3", { class: "row-title" },
+            tid ? el("a", { href: `#/moderation/${kind}/${tid}`, text: `${verb.toUpperCase()} ${kind} #${tid}` })
+                : el("span", { text: verb.toUpperCase() })),
+          el("div", { class: "row-side", text: utcStamp(e.created_at) }),
+          el("p", { class: "row-meta span", text: reason || "(no reason text)" })),
+      );
     }
     return frag;
   }],
@@ -1089,10 +1104,10 @@ const ROUTES = [
   // hash-chained moderation row about it, each carrying the public reason
   // rule 7 demands. The reasoning is not a nicety; it is the entire
   // difference between a record and a rumor.
-  [/^#\/changes\/(post|comment)\/(\d+)$/, async (m) => {
+  [/^#\/moderation\/(post|comment)\/(\d+)$/, async (m) => {
     const [, kind, id] = m;
     const frag = document.createDocumentFragment();
-    frag.append(el("a", { class: "back", href: "#/changes", text: "← Changes" }));
+    frag.append(el("a", { class: "back", href: "#/moderation", text: "← Moderation" }));
 
     let current = null;
     try {
