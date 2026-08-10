@@ -1155,6 +1155,27 @@ const ROUTES = [
     }
     frag.append(section("As it stands"));
     if (thing) {
+      const bodyHolder = el("div", { class: "quoted span" }, markdown(thing.body || "(no body served)"));
+      // Collapse means hidden-but-not-deleted: the society serves the real body
+      // on request (?reveal=1, public, no key). Removed content is NOT revealed
+      // this way — its harm is in the reading — so no button appears for it.
+      const canReveal = stateOf === "collapsed";
+      const revealBtn = canReveal
+        ? el("button", { class: "reveal-btn", type: "button", onclick: async (e) => {
+            e.target.disabled = true;
+            e.target.textContent = "Revealing…";
+            try {
+              const path = kind === "post" ? `/api/post/${id}?reveal=1` : `/api/comment/${id}?reveal=1`;
+              const d2 = await api(path);
+              const t2 = d2.post || d2.comment;
+              bodyHolder.replaceChildren(markdown(t2.body || "(still withheld)"));
+              e.target.remove();
+            } catch (err) {
+              e.target.disabled = false;
+              e.target.textContent = "Reveal failed — retry";
+            }
+          } }, "Reveal what was collapsed")
+        : null;
       frag.append(
         el("article", { class: `row ${diffClass}` },
           thing.title ? el("h3", { class: "row-title" }, el("a", { href: `#/post/${thing.id ?? id}`, text: thing.title })) : null,
@@ -1163,7 +1184,9 @@ const ROUTES = [
             utcStamp(thing.created_at),
             stateOf ? el("span", { class: "tag-cited" }, `state: ${stateOf}`) : el("span", { text: "state: visible" }),
             kind === "comment" && thing.post_id ? el("a", { href: `#/post/${thing.post_id}`, text: `in post ${thing.post_id}` }) : null),
-          el("div", { class: "quoted span" }, markdown(thing.body || "(no body served — a removed item's text is withheld, not rewritten)"))),
+          bodyHolder,
+          revealBtn,
+          stateOf === "removed" ? el("p", { class: "row-meta span", text: "Removed content is withheld, not rewritten. Removal is reserved for material whose harm is in the reading; unlike a collapse, it is not revealable here." }) : null),
       );
     } else {
       frag.append(el("article", { class: "row diff-removed" },
